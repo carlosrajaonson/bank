@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b1516">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Finora — Pilotage financier</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script src="supabase.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="mobile-header">
+      <a class="brand" href="#" aria-label="Finora accueil">
+        <span class="brand-symbol">f</span>
+        <span class="brand-name">finora<span>.</span></span>
+      </a>
+      <div class="header-actions">
+        <span id="connectionStatus" class="connection-pill"><i></i> Connexion…</span>
+        <button id="refreshBtn" class="icon-button" aria-label="Actualiser" title="Actualiser">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M5.6 9A7 7 0 0 1 18 6l2 6M4 12l2 6a7 7 0 0 0 12.4-3"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="app-content">
+      <section class="page active" id="page-cockpit">
+        <div class="welcome-row">
+          <div><div class="overline">VENDREDI 30 OCTOBRE</div><h1>Bonjour<span class="accent">.</span></h1><p class="subheading">Voici votre situation financière.</p></div>
+          <button class="avatar-button" aria-label="Profil">C</button>
+        </div>
+
+        <article class="balance-card">
+          <div class="balance-top"><span class="balance-label">TRÉSORERIE TOTALE</span><span class="live-indicator"><i></i> Données enregistrées</span></div>
+          <div class="balance-value" id="kpiCash">—</div>
+          <div class="balance-bottom"><span>Solde cumulé des portefeuilles</span><span class="balance-icon">↗</span></div>
+        </article>
+
+        <div class="section-heading compact-heading">
+          <div><h2>Votre activité</h2><p>Vue sur la période sélectionnée</p></div>
+          <select id="periodDays" class="period-select" aria-label="Période"><option value="30">30 jours</option><option value="90">90 jours</option><option value="365">12 mois</option></select>
+        </div>
+
+        <div class="metric-grid">
+          <article class="metric-card"><div class="metric-label"><span class="metric-dot income-dot"></span>Entrées</div><strong id="kpiIn" class="metric-value positive">—</strong><small>Flux entrants</small></article>
+          <article class="metric-card"><div class="metric-label"><span class="metric-dot expense-dot"></span>Sorties</div><strong id="kpiOut" class="metric-value negative">—</strong><small>Flux sortants</small></article>
+        </div>
+
+        <article class="panel chart-panel">
+          <div class="section-heading"><div><h2>Flux de trésorerie</h2><p>Entrées et sorties par mois</p></div><span class="chart-legend"><i class="legend-in"></i> Entrées <i class="legend-out"></i> Sorties</span></div>
+          <div class="chart-wrap"><canvas id="cashflowChart" aria-label="Graphique des entrées et sorties"></canvas></div>
+        </article>
+
+        <article class="panel chart-panel">
+          <div class="section-heading"><div><h2>Résultat économique</h2><p>Revenus moins dépenses enregistrés</p></div><span id="kpiResult" class="result-chip">—</span></div>
+          <div class="result-explain">Ce résultat simplifié n'est pas un résultat comptable complet.</div>
+        </article>
+
+        <article class="panel">
+          <div class="section-heading"><div><h2>Dernières opérations</h2><p>Vos mouvements récents</p></div><button class="text-action" data-goto="transactions">Tout voir <span>→</span></button></div>
+          <div id="recentTransactions" class="activity-list"><div class="empty-state">Les opérations apparaîtront ici.</div></div>
+        </article>
+
+        <div class="quality-note"><span class="quality-icon">✓</span><span><strong>Des chiffres sans approximation.</strong><br>Les devises restent séparées et les prévisions ne sont pas mélangées aux opérations réelles.</span></div>
+      </section>
+
+      <section class="page" id="page-transactions">
+        <div class="page-title-row"><div><div class="overline">JOURNAL FINANCIER</div><h1>Transactions</h1><p class="subheading">Chaque mouvement, clairement tracé.</p></div></div>
+        <button id="newTransactionBtn" class="primary-button full-button"><span>＋</span> Nouvelle transaction</button>
+
+        <article class="panel form-panel">
+          <div class="section-heading"><div><h2>Nouvelle opération</h2><p>Préparez puis validez votre saisie.</p></div><span id="draftBadge" class="state-pill">Brouillon</span></div>
+          <form id="transactionForm">
+            <input type="hidden" id="txId">
+            <div class="field"><label for="txType">Type d'opération</label><select id="txType" required><option value="expense">Dépense</option><option value="income">Revenu</option><option value="transfer">Transfert</option><option value="loan_received">Emprunt reçu</option><option value="loan_given">Prêt accordé</option><option value="capital_contribution">Apport en capital</option><option value="debt_repayment">Remboursement de dette</option><option value="opening_balance">Solde initial</option></select></div>
+            <div class="field"><label for="txAmount">Montant</label><div class="amount-input-wrap"><input id="txAmount" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="0" required><select id="txCurrency" aria-label="Devise"><option value="MGA">Ar</option><option value="USD">USD</option><option value="EUR">EUR</option></select></div></div>
+            <div class="field"><label for="txDescription">Description</label><textarea id="txDescription" rows="2" maxlength="1000" placeholder="À quoi correspond cette opération ?" required></textarea></div>
+            <div class="field"><label for="txDate">Date</label><input id="txDate" type="date" required></div>
+            <div class="field"><label for="txCategory">Catégorie</label><input id="txCategory" maxlength="100" placeholder="Ex. Publicité, salaire…"></div>
+            <div class="field"><label for="txSource">Portefeuille source</label><select id="txSource"><option value="">Non renseigné</option></select></div>
+            <div class="field"><label for="txDestination">Portefeuille destination</label><select id="txDestination"><option value="">Non renseigné</option></select></div>
+            <details class="optional-fields"><summary>Informations complémentaires</summary>
+              <div class="field"><label for="txCompany">Entreprise / entité</label><input id="txCompany" maxlength="120"></div>
+              <div class="field"><label for="txActivity">Activité bénéficiaire</label><input id="txActivity" maxlength="120"></div>
+              <div class="field"><label for="txCounterparty">Personne / contrepartie</label><input id="txCounterparty" maxlength="120"></div>
+            </details>
+            <div id="formErrors" class="form-errors" hidden></div>
+            <div class="form-actions"><button type="button" id="resetTransaction" class="secondary-button">Effacer</button><button type="submit" id="validateTransaction" class="primary-button" disabled>Valider l'opération</button></div>
+          </form>
+        </article>
+
+        <article class="panel">
+          <div class="section-heading"><div><h2>Assistant financier</h2><p>Décrivez une opération ou posez une question sur vos finances.</p></div><span class="ai-badge">IA</span></div>
+          <div id="chatLog" class="chat-log"><div class="chat-bubble assistant">Bonjour. Décrivez une opération et je préparerai un brouillon à vérifier.</div></div>
+          <div class="chat-compose"><input id="chatInput" placeholder="Ex. 50 000 Ar de carburant, ou solde Mvola…" aria-label="Message à l'assistant"><button id="chatSend" aria-label="Envoyer">↑</button></div>
+          <p class="micro-copy">L'assistant prépare uniquement. Vous gardez toujours la validation finale.</p>
+        </article>
+
+        <article class="panel">
+          <div class="section-heading"><div><h2>Historique</h2><p>Opérations validées</p></div></div>
+          <input id="transactionSearch" class="search-input" placeholder="⌕  Rechercher une opération…">
+          <div id="transactionRows" class="transaction-list"><div class="empty-state">Aucune opération chargée.</div></div>
+        </article>
+      </section>
+
+      <section class="page" id="page-treasury">
+        <div class="page-title-row"><div><div class="overline">LIQUIDITÉS</div><h1>Trésorerie</h1><p class="subheading">Vos disponibilités, portefeuille par portefeuille.</p></div></div>
+        <div class="panel"><div class="section-heading"><div><h2>Mes portefeuilles</h2><p>Soldes calculés à partir des mouvements</p></div></div><div id="walletRows" class="wallet-list"><div class="empty-state">Aucun portefeuille enregistré.</div></div></div>
+        <div class="info-card"><strong>À vérifier</strong><p>Un solde n'est fiable que si le solde initial et tous les mouvements depuis cette date ont été saisis et rapprochés.</p></div>
+      </section>
+
+      <section class="page" id="page-performance">
+        <div class="page-title-row"><div><div class="overline">RENTABILITÉ</div><h1>Performance</h1><p class="subheading">Comprendre ce qui génère de la valeur.</p></div></div>
+        <div class="panel"><div class="section-heading"><div><h2>Revenus & dépenses</h2><p>Par activité enregistrée</p></div></div><div id="performanceContent" class="performance-list"><div class="empty-state">Aucune donnée disponible.</div></div></div>
+        <div class="panel chart-panel"><div class="section-heading"><div><h2>Répartition des dépenses</h2><p>Par catégorie</p></div></div><div class="chart-wrap doughnut-wrap"><canvas id="expenseChart" aria-label="Répartition des dépenses par catégorie"></canvas></div><div id="expenseLegend" class="chart-category-list"></div></div>
+        <div class="info-card">Cette vue est une lecture simplifiée des transactions classées en revenus et dépenses, pas un compte de résultat comptable complet.</div>
+      </section>
+
+      <section class="page" id="page-patrimoine">
+        <div class="page-title-row"><div><div class="overline">ACTIFS & PASSIFS</div><h1>Patrimoine</h1><p class="subheading">Une vision nette de ce que vous possédez et devez.</p></div></div>
+        <div class="empty-feature"><div class="feature-icon">◇</div><h2>Registre patrimonial</h2><p>Les actifs, leur valeur vérifiée ou estimée et les dettes seront affichés ici lorsqu'ils seront configurés.</p><span class="state-pill">Module à compléter</span></div>
+      </section>
+
+      <section class="page" id="page-capital">
+        <div class="page-title-row"><div><div class="overline">ALLOCATION DU CAPITAL</div><h1>Investissements</h1><p class="subheading">Suivez vos apports et vos opportunités.</p></div></div>
+        <div class="empty-feature"><div class="feature-icon">▤</div><h2>Suivi des investissements</h2><p>Les investissements, leurs flux, leur valorisation et leur rentabilité seront visibles ici après activation du registre dédié.</p><span class="state-pill">Module à compléter</span></div>
+      </section>
+
+      <section class="page" id="page-forecast">
+        <div class="page-title-row"><div><div class="overline">SIMULATION</div><h1>Prévisions</h1><p class="subheading">Projetez plusieurs scénarios sans toucher au réel.</p></div></div>
+        <article class="panel">
+          <div class="section-heading"><div><h2>Scénario de trésorerie</h2><p>Modifiez les hypothèses mensuelles.</p></div></div>
+          <div class="field"><label for="forecastIncome">Entrées mensuelles prévues (Ar)</label><input type="number" id="forecastIncome" min="0" value="1000000" inputmode="decimal"></div>
+          <div class="field"><label for="forecastExpense">Sorties mensuelles prévues (Ar)</label><input type="number" id="forecastExpense" min="0" value="700000" inputmode="decimal"></div>
+          <div class="field"><label for="forecastMonths">Horizon en mois</label><input type="number" id="forecastMonths" min="1" max="60" value="6" inputmode="numeric"></div>
+          <button id="runForecast" class="primary-button full-button">Calculer le scénario</button>
+          <div id="forecastResult" class="forecast-result">Votre simulation apparaîtra ici.</div>
+        </article>
+        <div class="info-card">Une prévision est une hypothèse. Elle ne sera jamais ajoutée aux soldes ou aux résultats réels.</div>
+      </section>
+
+      <section class="page" id="page-control">
+        <div class="page-title-row"><div><div class="overline">QUALITÉ & COHÉRENCE</div><h1>Contrôles</h1><p class="subheading">Repérez les anomalies avant qu'elles ne faussent vos décisions.</p></div></div>
+        <button id="runChecks" class="secondary-button full-button">↻ Relancer les contrôles</button>
+        <div class="panel"><div class="section-heading"><div><h2>Anomalies détectées</h2><p>Contrôles simples sur les données chargées</p></div></div><div id="controlIssues" class="control-list"><div class="empty-state">Aucune anomalie chargée.</div></div></div>
+      </section>
+
+      <section class="page" id="page-admin">
+        <div class="page-title-row"><div><div class="overline">CONFIGURATION</div><h1>Paramètres</h1><p class="subheading">Gérez les bases de votre espace financier.</p></div></div>
+        <div class="panel"><div class="section-heading"><div><h2>Ajouter un portefeuille</h2><p>Compte bancaire, espèces, mobile money…</p></div></div>
+          <form id="walletForm">
+            <div class="field"><label for="walletName">Nom du portefeuille</label><input id="walletName" required maxlength="120" placeholder="Ex. MVola Licorne"></div>
+            <div class="field"><label for="walletCurrency">Devise</label><select id="walletCurrency"><option value="MGA">Ariary (MGA)</option><option value="USD">Dollar (USD)</option><option value="EUR">Euro (EUR)</option></select></div>
+            <div class="field"><label for="walletOpening">Solde initial</label><input id="walletOpening" type="number" step="0.01" value="0" inputmode="decimal"></div>
+            <div class="field"><label for="walletDate">Date du solde initial</label><input id="walletDate" type="date" required></div>
+            <button class="primary-button full-button" type="submit">Créer le portefeuille</button>
+          </form>
+        </div>
+        <div class="panel"><div class="section-heading"><div><h2>Connexion & sécurité</h2><p>État de la configuration</p></div></div><div id="adminStatus" class="admin-status">Vérification…</div><button id="signOutBtn" class="secondary-button full-button" type="button">Se déconnecter</button><p class="micro-copy">Ne placez jamais de clé service_role ou de clé IA dans le code frontend. RLS doit être activé et configuré côté Supabase.</p></div>
+      </section>
+    </main>
+
+    <button class="quick-add" id="quickAdd" aria-label="Nouvelle transaction">＋</button>
+
+    <nav class="bottom-nav" id="navigation" aria-label="Navigation principale">
+      <button class="nav-item active" data-page="cockpit"><span class="nav-icon">⌂</span><span>Accueil</span></button>
+      <button class="nav-item" data-page="transactions"><span class="nav-icon">⇄</span><span>Opérations</span></button>
+      <button class="nav-item" data-page="treasury"><span class="nav-icon">◉</span><span>Comptes</span></button>
+      <button class="nav-item" data-page="performance"><span class="nav-icon">⌁</span><span>Analyse</span></button>
+      <button class="nav-item" data-page="admin"><span class="nav-icon">•••</span><span>Plus</span></button>
+    </nav>
+  </div>
+  <section id="authGate" class="auth-gate" hidden>
+    <form id="authForm" class="auth-card">
+      <div class="brand auth-brand"><span class="brand-symbol">f</span><span class="brand-name">finora<span>.</span></span></div>
+      <div class="overline">ESPACE SÉCURISÉ</div>
+      <h1>Connexion<span class="accent">.</span></h1>
+      <p class="subheading">Connectez-vous pour accéder à vos données financières et à l'assistant.</p>
+      <label for="authEmail">Adresse e-mail</label>
+      <input id="authEmail" type="email" autocomplete="username" required placeholder="vous@entreprise.com">
+      <label for="authPassword">Mot de passe</label>
+      <input id="authPassword" type="password" autocomplete="current-password" required placeholder="Votre mot de passe">
+      <p id="authMessage" class="auth-message" aria-live="polite"></p>
+      <button id="authSubmit" class="primary-button full-button" type="submit">Se connecter</button>
+      <p class="micro-copy">Le compte doit être créé ou autorisé dans Supabase Auth.</p>
+    </form>
+  </section>
+  <div id="toastHost" aria-live="polite"></div>
+</body>
+</html>
